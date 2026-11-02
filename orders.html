@@ -54,8 +54,26 @@ input[type=search]{width:100%;font:inherit;color:var(--ink);padding:0 16px;heigh
 .ord.open .more{display:block}
 .ord a{color:var(--r2);font-weight:600}
 .tap{margin-top:8px;color:var(--mute);font-size:11px}
+.ord .row{display:flex;gap:12px;align-items:flex-start}
+.ord .main{flex:1;min-width:0}
+.ord .act{flex:none;display:grid;gap:8px;width:96px}
+.ord .act button{height:40px;padding:0 8px;font-size:13px;border-radius:12px;box-shadow:none;width:100%}
+.ord .act .pop{color:#fff;border:0;background:linear-gradient(90deg,var(--r1),var(--r2));box-shadow:0 6px 14px rgba(179,0,27,.3)}
+.ord .act button:disabled{opacity:.55;cursor:default}
+.ord .more{margin-top:10px}
+.sheet{position:fixed;top:0;right:0;bottom:0;left:0;z-index:50;display:flex;align-items:flex-end;justify-content:center;background:rgba(40,0,6,.5)}
+.sbox{width:100%;max-width:420px;background:var(--bg1);border-radius:24px 24px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));display:grid;gap:10px}
+.sbox h2{font-size:16px;margin:0}
+.sbox button{width:100%;height:48px;text-align:left;padding:0 16px}
+.sbox button.cur{border-color:var(--r2);color:var(--r2)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;max-width:90%;padding:10px 16px;border-radius:14px;background:var(--errbg);color:var(--err);font-size:13px;font-weight:600}
+@media(max-width:380px){.ord .act{width:84px}.ord .act button{font-size:12px}}
 .empty{text-align:center;color:var(--mute);font-size:14px;padding:18px 8px}
 .empty.err{color:var(--err);font-weight:600}
+.wrap,.list{grid-template-columns:minmax(0,1fr)}
+.ord{min-width:0;overflow:hidden}
+.ord .main{overflow-wrap:anywhere}
+@media(max-width:520px){.wrap{padding:14px 12px 32px}.card{padding:14px}.ord{padding:12px}.ord .row{gap:10px}.ord .act{width:80px}.ord .act button{height:38px;font-size:12px;padding:0 4px}.ord .id{font-size:15px}}
 </style>
 <script>if(matchMedia("(prefers-color-scheme: dark)").matches)document.documentElement.setAttribute("data-theme","dark")</script>
 <style id="lockcss">body{visibility:hidden}</style>
@@ -104,6 +122,7 @@ input[type=search]{width:100%;font:inherit;color:var(--ink);padding:0 16px;heigh
   </section>
   <div class="list" id="list"></div>
   <p class="empty" id="state">Memuat order…</p>
+<div class="sheet" id="sheet" hidden><div class="sbox" role="dialog" aria-modal="true"><h2 id="sheetT">Ubah status</h2><div id="sheetB" style="display:grid;gap:10px"></div><button type="button" id="sheetX">Batal</button></div></div>
 </div>
 <script>
 var $=function(i){return document.getElementById(i)};
@@ -133,13 +152,14 @@ function card(r){
     more+='<div><b>'+esc(H[i])+':</b> '+link(v)+'</div>';
   }
   var isi=val(r,'isipop');
-  return '<article class="ord"><div class="top"><b class="id">'+esc(id)+'</b>'+(st?'<span class="badge '+sCls(st)+'">'+esc(st)+'</span>':'')+'</div>'
+  return '<article class="ord" data-id="'+esc(id)+'"><div class="row"><div class="main"><div class="top"><b class="id">'+esc(id)+'</b>'+(st?'<span class="badge '+sCls(st)+'">'+esc(st)+'</span>':'')+'</div>'
    +'<div class="when">'+esc(val(r,'waktu'))+'</div>'
    +(who?'<div class="who">'+esc(who)+'</div>':'')+(what?'<div class="what">'+esc(what)+'</div>':'')
    +(val(r,'header')?'<div class="hdr">'+esc(val(r,'header'))+'</div>':'')
    +(isi?'<div class="isi">'+esc(isi)+'</div>':'')
+   +'</div><div class="act"><button type="button" class="pop" data-act="pop">Buat POP</button><button type="button" data-act="upd">Update</button></div></div>'
    +(more?'<div class="more">'+more+'</div>':'')
-   +'<div class="tap">Ketuk untuk '+'detail</div></article>';
+   +'<div class="tap">Ketuk untuk detail</div></article>';
 }
 function render(){
   var q=norm($('q').value),out=[],counts={};
@@ -179,7 +199,48 @@ function load(){
 }
 $('q').addEventListener('input',render);
 $('chips').addEventListener('click',function(e){var b=e.target.closest('.chip');if(!b)return;filter=b.getAttribute('data-s');render()});
-$('list').addEventListener('click',function(e){if(e.target.closest('a'))return;var c=e.target.closest('.ord');if(c)c.classList.toggle('open')});
+var STATUSES=['Baru','Diproses','Selesai','Batal'];
+function toast(t){var d=document.createElement('div');d.className='toast';d.textContent=t;document.body.appendChild(d);setTimeout(function(){d.remove()},3500)}
+function findRow(id){var ci=col('idorder');for(var i=0;i<ROWS.length;i++){var v=ci<0?ROWS[i][0]:ROWS[i][ci];if(String(v).trim()===id)return ROWS[i]}return null}
+function setStatus(id,status){
+  return post({action:'updatestatus',token:tok(),id:id,status:status}).then(function(r){
+    if(!r.ok){if(r.error==='sesi'){location.replace('login.html');throw 0}throw new Error(r.error||'error')}
+    var row=findRow(id),si=col('status');if(row&&si>=0)row[si]=status;render();
+  });
+}
+function fail(e){if(e!==0)toast('Gagal memperbarui status ('+(e&&e.message||'tidak terhubung')+').')}
+function saveOrder(id){
+  var row=findRow(id);if(!row)return;
+  var f={};for(var i=0;i<H.length;i++)f[norm(H[i])]=String(row[i]==null?'':row[i]).trim();
+  try{sessionStorage.setItem('mds_order',JSON.stringify({id:id,f:f}))}catch(e){}
+}
+function openSheet(id){
+  var row=findRow(id),cur=row?val(row,'status').toLowerCase():'';
+  $('sheetT').textContent='Ubah status '+id;
+  $('sheetB').innerHTML=STATUSES.map(function(s){return '<button type="button" data-s="'+s+'" class="'+(cur===s.toLowerCase()?'cur':'')+'">'+s+'</button>'}).join('');
+  $('sheet').hidden=false;$('sheet').setAttribute('data-id',id);
+}
+$('sheetX').onclick=function(){$('sheet').hidden=true};
+$('sheet').addEventListener('click',function(e){
+  if(e.target===this){this.hidden=true;return}
+  var b=e.target.closest('button[data-s]');if(!b)return;
+  var id=this.getAttribute('data-id');this.hidden=true;
+  setStatus(id,b.getAttribute('data-s')).catch(fail);
+});
+$('list').addEventListener('click',function(e){
+  var c=e.target.closest('.ord');if(!c)return;
+  var b=e.target.closest('button[data-act]');
+  if(b){
+    var id=c.getAttribute('data-id');
+    if(b.getAttribute('data-act')==='upd'){openSheet(id);return}
+    b.disabled=true;b.textContent='Memproses…';
+    saveOrder(id);
+    setStatus(id,'Diproses').then(function(){location.href='index.html?order='+encodeURIComponent(id)}).catch(function(e){fail(e);render()});
+    return;
+  }
+  if(e.target.closest('a'))return;
+  c.classList.toggle('open');
+});
 $('refresh').onclick=load;
 $('buat').onclick=function(){location.href='index.html'};
 $('logout').onclick=function(){
