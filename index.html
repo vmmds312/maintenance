@@ -52,7 +52,9 @@ button{font:inherit;font-weight:600;border:0;border-radius:999px;padding:0 18px;
 .jhead{display:flex;justify-content:space-between;align-items:center;margin:6px 0 8px;font-size:14px}
 .lnk{background:none;border:0;color:var(--mute);font-size:12px;font-weight:500;height:auto;padding:0;text-decoration:underline;box-shadow:none;border-radius:0}
 .jobs{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:8px;text-align:left}
-.jobs li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:var(--inp);border:1px solid var(--line)}
+.jobs li{padding:10px 12px;border-radius:14px;background:var(--inp);border:1px solid var(--line)}
+.jobs summary{display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;list-style:none}.jobs summary::-webkit-details-marker{display:none}.jobs summary::after{content:'▾';flex:none;color:var(--mute);font-size:12px}.jobs details[open] summary::after{transform:rotate(180deg)}
+.jd{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:12px;color:var(--mute);display:grid;gap:3px}.jd b{color:var(--ink);font-weight:600}
 .jl{min-width:0}.jl b{display:block;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.jl span{font-size:11px;color:var(--mute)}
 .jb{flex:none;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;background:var(--warnbg);color:var(--warn)}
 .jb-mencetak,.jb-di_printer{background:rgba(30,100,220,.16);color:#2c6fe0;animation:jp 1s infinite}
@@ -782,14 +784,17 @@ $('print').onclick=function(){
   function hm(t){var d=new Date(t);return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)}
   function active(j){return j.s==='menunggu'||j.s==='mencetak'||j.s==='di_printer'}
   function load(){try{var a=JSON.parse(localStorage.getItem(KEY)||'[]'),lim=Date.now()-864e5;return a.filter(function(j){return j&&j.id&&j.t>lim})}catch(e){return []}}
-  var jobs=load();
+  var jobs=load(),OPEN={};
+  $('jobs').addEventListener('toggle',function(e){var d=e.target;if(d&&d.getAttribute&&d.getAttribute('data-id'))OPEN[d.getAttribute('data-id')]=d.open},true);
   function save(){try{localStorage.setItem(KEY,JSON.stringify(jobs.slice(0,10)))}catch(e){}}
   function draw(){
     $('jobsBox').hidden=!jobs.length;
     $('jobsClear').hidden=!jobs.some(function(j){return !active(j)});
     $('jobs').innerHTML=jobs.map(function(j){
       var wait=j.s==='menunggu'&&Date.now()-j.t>300000;
-      return '<li><div class="jl"><b>'+esc(j.l)+'</b><span>'+j.n+' lembar · '+hm(j.t)+(wait?' · PC belum merespons':'')+(j.c?' · '+esc(j.c):'')+'</span></div><span class="jb jb-'+j.s+'">'+(LBL[j.s]||j.s)+'</span></li>';
+      var od=j.o?'No. Order '+esc(j.o):'Tanpa order',L=LBL[j.s]||j.s;
+      return '<li><details data-id="'+esc(j.id)+'"'+(OPEN[j.id]?' open':'')+'><summary><div class="jl"><b>'+esc(j.l)+'</b><span>'+od+' · '+j.n+' lembar · '+hm(j.t)+(wait?' · PC belum merespons':'')+(j.c?' · '+esc(j.c):'')+'</span></div><span class="jb jb-'+j.s+'">'+L+'</span></summary>'
+        +'<div class="jd"><div><b>ID Order:</b> '+(j.o?esc(j.o):'-')+'</div><div><b>ID job:</b> '+esc(j.id)+'</div><div><b>Jumlah:</b> '+j.n+' lembar</div><div><b>Dikirim:</b> '+hm(j.t)+'</div><div><b>Status:</b> '+L+'</div>'+(j.c?'<div><b>Catatan:</b> '+esc(j.c)+'</div>':'')+'</div></details></li>';
     }).join('');
   }
   function tick(){
@@ -814,7 +819,7 @@ $('print').onclick=function(){
     post({action:'enqueue',token:tok(),label:label,w:pw,h:ph,copies:copies,img:$('img').src,order:window.MDS_ORDER_ID||''}).then(function(r){
       sending=false;$('send').disabled=false;
       if(!r.ok){say(r.error==='sesi'?'Sesi habis. Masuk lagi.':'Gagal mengirim ('+(r.error||'error')+').');return}
-      jobs.unshift({id:r.id,l:label,n:copies,t:Date.now(),s:'menunggu'});jobs=jobs.slice(0,10);save();draw();
+      jobs.unshift({id:r.id,l:label,n:copies,t:Date.now(),s:'menunggu',o:window.MDS_ORDER_ID||''});jobs=jobs.slice(0,10);save();draw();
       say('Terkirim ✓ Antrian ke-'+r.posisi+'. Boleh kirim POP lain.',5000);start();
     }).catch(function(){sending=false;$('send').disabled=false;say('Tidak bisa terhubung. Coba lagi.')});
   }
