@@ -811,7 +811,7 @@ $('print').onclick=function(){
   function qtyVal(){var n=parseInt($('qty').value,10);return Math.max(1,Math.min(50,isNaN(n)?1:n))}
   function doSend(pw,ph,label,copies){
     sending=true;$('send').disabled=true;say('Mengirim…');
-    post({action:'enqueue',token:tok(),label:label,w:pw,h:ph,copies:copies,img:$('img').src}).then(function(r){
+    post({action:'enqueue',token:tok(),label:label,w:pw,h:ph,copies:copies,img:$('img').src,order:window.MDS_ORDER_ID||''}).then(function(r){
       sending=false;$('send').disabled=false;
       if(!r.ok){say(r.error==='sesi'?'Sesi habis. Masuk lagi.':'Gagal mengirim ('+(r.error||'error')+').');return}
       jobs.unshift({id:r.id,l:label,n:copies,t:Date.now(),s:'menunggu'});jobs=jobs.slice(0,10);save();draw();
@@ -865,6 +865,7 @@ $('print').onclick=function(){
   sessionStorage.removeItem('mds_order');
   var o;try{o=JSON.parse(raw)}catch(e){return}
   var f=o.f||{},notes=[];
+  window.MDS_ORDER_ID=String(o.id||'');   /* dikirim saat "Kirim ke PC cetak" agar status order otomatis Selesai */
   function g(k){return String(f[k]||'').trim()}
   /* Campaign: isi order berbentuk "Nama varian | Beli berapa (X): 2, Diskon (%): 20, ..." -> isi varian dan angka */
   /* Sale: isi order berbentuk "Beli X gratis X | Beli 2 gratis 1" atau "Beli 1 diskon X%, Beli X gratis X | Diskon 50%, Beli pertama 1, Beli 2 gratis 1" */
